@@ -8,6 +8,10 @@
 // ============= KONFIGURATION =============
 
 const CONFIG_OPEN_URL = false
+const CONFIG_GRAPH_SHOW_DAYS = 7
+const CONFIG_STORE_DAYS = 14
+const CONFIG_CACHE_REQUESTS = true // not yet implemented
+const CONFIG_REFRESH_INTERVAL = 60 * 60 // in seconds
 
 // ============= ============= =============
 
@@ -61,7 +65,11 @@ const BUNDESLAENDER_SHORT = {
     'Thüringen': 'TH'
 };
 
-let MEDIUMWIDGET = (config.widgetFamily === 'medium') ? true : false
+const ALIGN_LEFT = 'align_left'
+const ALIGN_RIGHT = 'align_right'
+const ALIGN_CENTER = 'align_center'
+
+let MEDIUMWIDGET = config.widgetFamily === 'medium'
 let staticCoordinates = []
 if (args.widgetParameter) {
     staticCoordinates = parseInput(args.widgetParameter)
@@ -110,7 +118,7 @@ async function createWidget() {
             addIncidenceBlockTo(incidenceRow, data1, [2, padding, 10, 10], 1)
         }
         if (CONFIG_OPEN_URL) list.url = "https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4"
-        list.refreshAfterDate = new Date(Date.now() + 60 * 60 * 1000)
+        list.refreshAfterDate = new Date(Date.now() + CONFIG_REFRESH_INTERVAL * 1000)
     } else {
         headerRow.addSpacer()
         list.addSpacer()
@@ -166,9 +174,17 @@ function getBLCases(states, BL) {
     return 0
 }
 
-function getChartData (data, field) {
-    const chartdata = new Array(7).fill(0);
-    const offset = 7 - Object.keys(data).length
+function getChartData(data, field, maxDays = CONFIG_GRAPH_SHOW_DAYS, align = ALIGN_LEFT) {
+    const chartdata = new Array(maxDays).fill(0);
+    let offset;
+    if (align === ALIGN_RIGHT) {
+        offset = maxDays - Object.keys(data).length;
+    } else if (align === ALIGN_CENTER) {
+        offset = Math.floor((maxDays - Object.keys(data).length) / 2);
+    } else {
+        // ALIGN_LEFT as default for unknown values
+        offset = 0;
+    }
     Object.keys(data).forEach((key, index) => {
         chartdata[offset + index] = data[key][field]
     })
@@ -267,7 +283,7 @@ function addLabelTo(view, text, font = false, textColor = false) {
 }
 
 function formatNumber(number) {
-    return new Number(number).toLocaleString('de-DE')
+    return Number(number).toLocaleString('de-DE')
 }
 
 function getTrendArrow(value1, value2) {
@@ -284,7 +300,7 @@ function addTrendsBarToIncidenceBlock(view, data) {
     trendsBarBox.addSpacer()
     let chartdataBL = getChartData(data, 'incidenceBL')
     // chartdataBL = [4,28,35,51,75,105,60] // DEMO!!!
-    addChartBlockTo(trendsBarBox, getGetLastCasesAndTrend(data, 'cases', true, true), chartdataBL, false)
+    addChartBlockTo(trendsBarBox, getGetLastCasesAndTrend(data, 'cases', true, true), chartdataBL, ALIGN_RIGHT)
 }
 
 function addHeaderRowTo(view) {
@@ -296,34 +312,45 @@ function addHeaderRowTo(view) {
     return headerRow;
 }
 
-function addChartBlockTo(view, trendtitle, chartdata, alignLeft = true) {
+function addChartBlockTo(view, trendtitle, chartdata, align = ALIGN_LEFT) {
     let block = view.addStack()
     block.layoutVertically()
     block.size = new Size(58, 24)
 
-    let textRow = block.addStack()
-    if (!alignLeft) textRow.addSpacer()
-    let chartText = textRow.addText(trendtitle)
-    if (alignLeft) textRow.addSpacer()
-    chartText.font = Font.mediumSystemFont(10)
-
-    let graphImg = generateGraph(chartdata, 58, 10, alignLeft).getImage()
+    let graphImg = generateGraph(chartdata, 58, 10, align).getImage()
     let chartImg = block.addImage(graphImg)
     chartImg.resizable = false
+
+    let textRow = block.addStack()
+    if (align === ALIGN_RIGHT) textRow.addSpacer()
+    let chartText = textRow.addText(trendtitle)
+    if (align === ALIGN_LEFT) textRow.addSpacer()
+    chartText.font = Font.mediumSystemFont(10)
 }
 
-function generateGraph(data, width, height, alignLeft = true) {
+function generateGraph(data, width, height, align = ALIGN_LEFT, zeroTop = false) {
     let context = new DrawContext()
     context.size = new Size(width, height)
     context.opaque = false
     let min = Math.min(...data)
     let max = Math.max(...data) - min
     let w = Math.round((width - (data.length * 2)) / data.length)
-    let xOffset = (!alignLeft) ? (width - (data.length * (w + 1))) : 0
+
+    let xOffset
+    if (align === ALIGN_LEFT) {
+        xOffset = 0
+    } else if (align === ALIGN_CENTER) {
+        xOffset = (width - (data.length * (w + 1))) / 2
+    } else if (align === ALIGN_RIGHT) {
+        xOffset = width - (data.length * (w + 1))
+    }
+
+    //let xOffset = (!align) ? (width - (data.length * (w + 1))) : 0
     data.forEach((value, index) => {
         let h = Math.max(2, Math.round((value - min) / max * height))
         let x = xOffset + (w + 1) * index
-        let rect = new Rect(x, 0, w, h)
+        let y = (!zeroTop) ? height - h : 0
+        let rect = new Rect(x, y, w, h)
         context.setFillColor(getIncidenceColor(value))
         context.fillRect(rect)
     })
@@ -465,26 +492,15 @@ function getDataForDate(data, dayOffset = 0) {
     return (data[dateKey]) ? data[dateKey] : false
 }
 
-async function saveLoadData (dataId, data) {
-    const loadedData = await loadData(dataId, data.areaName)
-    loadedData[data.updated.substr(0, 10)] = data
-    const loadedDataKeys = Object.keys(loadedData);
-    const lastDaysKeys = loadedDataKeys.slice(Math.max(Object.keys(loadedData).length - 7, 0))
-    let loadedDataLimited = {}
-    lastDaysKeys.forEach(key => {
-        loadedDataLimited[key] = loadedData[key]
-    })
-
-    // let fm = getFilemanager()
-    // let path = fm.joinPath(fm.documentsDirectory(), 'coronaWidget' + dataId + '.json')
-    // fm.writeString(path, JSON.stringify(loadedDataLimited))
-    await storeData(dataId, loadedDataLimited)
-    return loadedData
+async function storeData(dataId, data) {
+    let fm = getFilemanager()
+    let path = fm.joinPath(fm.documentDirectory(), 'coronaWidget' + dataId + '.json')
+    fw.writeString(path, JSON.stringify(data))
 }
 
 async function loadData(dataId, oldAreaName) {
     let fm = getFilemanager()
-    
+
     let oldPath = fm.joinPath(fm.documentsDirectory(), 'covid19' + oldAreaName + '.json')
     let path = fm.joinPath(fm.documentsDirectory(), 'coronaWidget' + dataId + '.json')
     if (fm.isFileStoredIniCloud(oldPath) && !fm.isFileDownloaded(oldPath)) {
@@ -496,6 +512,23 @@ async function loadData(dataId, oldAreaName) {
         await fm.downloadFileFromiCloud(path)
     }
     return (fm.fileExists(path)) ? JSON.parse(fm.readString(path)) : {}
+}
+
+async function saveLoadData(dataId, data, days = CONFIG_STORE_DAYS) {
+    const loadedData = await loadData(dataId, data.areaName)
+    loadedData[data.updated.substr(0, 10)] = data
+    const loadedDataKeys = Object.keys(loadedData);
+    const lastDaysKeys = loadedDataKeys.slice(Math.max(Object.keys(loadedData).length - days, 0))
+    let loadedDataLimited = {}
+    lastDaysKeys.forEach(key => {
+        loadedDataLimited[key] = loadedData[key]
+    })
+
+    // let fm = getFilemanager()
+    // let path = fm.joinPath(fm.documentsDirectory(), 'coronaWidget' + dataId + '.json')
+    // fm.writeString(path, JSON.stringify(loadedDataLimited))
+    await storeData(dataId, loadedDataLimited)
+    return loadedData
 }
 
 function getFilemanager() {
@@ -524,7 +557,7 @@ function parseRCSV(rDataStr) {
     let elements = [];
     for (let i = 0; i < lines.length; i++) {
         let element = {};
-        let j = 0;
+        let j = 0, matches;
         while (matches = valuesRegExp.exec(lines[i])) {
             var value = matches[1] || matches[2];
             value = value.replace(/\"\"/g, "\"");
