@@ -70,8 +70,7 @@ if (args.widgetParameter) {
     }
 }
 
-let data = {}
-let weekData = {}
+let cache = {}
 const widget = await createWidget()
 widget.setPadding(0, 0, 0, 0)
 if (!config.runsInWidget) {
@@ -344,6 +343,27 @@ async function getLocation(staticCoordinateIndex = false) {
     }
 }
 
+async function cachedRequest(url, type = 'json') {
+    const index = type + '_' + url
+    const cached = cache[index]
+    let res
+
+    if (typeof cached === 'undefined') {
+        switch (type) {
+            case 'json':
+                res = await new Request(url).loadJSON()
+                break;
+            case 'string':
+                res = await new Request(url).loadString()
+                break;
+        }
+        cache[index] = res
+    } else {
+        res = cached
+    }
+    return res
+}
+
 async function getData(useStaticCoordsIndex = false) {
     let rValue = 0
     try {
@@ -352,19 +372,21 @@ async function getData(useStaticCoordsIndex = false) {
     }
 
     try {
-        let dataCases = await new Request(apiUrlNewCases).loadJSON()
+        let dataCases = await cachedRequest(apiUrlNewCases, 'json')
         const cases = dataCases.features[0].attributes.value
 
-        let dataStates = await new Request(apiUrlStates).loadJSON()
-        const incidencePerState = dataStates.features.map((f) => { return {
-            BL: BUNDESLAENDER_SHORT[f.attributes.LAN_ew_GEN],
-            incidence: f.attributes.cases7_bl_per_100k,
-            cases: f.attributes.Fallzahl
-        }})
+        let dataStates = await cachedRequest(apiUrlStates, 'json')
+        const incidencePerState = dataStates.features.map((f) => {
+            return {
+                BL: BUNDESLAENDER_SHORT[f.attributes.LAN_ew_GEN],
+                incidence: f.attributes.cases7_bl_per_100k,
+                cases: f.attributes.Fallzahl
+            }
+        })
 
         const averageIncidence = incidencePerState.reduce((a, b) => a + b.incidence, 0) / incidencePerState.length
         const location = await getLocation(useStaticCoordsIndex)
-        let data = await new Request(apiUrl(location)).loadJSON()
+        let data = await cachedRequest(apiUrl(location), 'json')
         const attr = data.features[0].attributes
         const res = {
             incidence: parseFloat(attr.cases7_per_100k.toFixed(1)),
@@ -386,7 +408,7 @@ async function getData(useStaticCoordsIndex = false) {
 }
 
 async function getRValue() {
-    const rDataStr = await new Request(apiRUrl).loadString()
+    const rDataStr = await cachedRequest(apiRUrl, 'string')
     const rData = parseRCSV(rDataStr)
     let lastR = 0
     rData.forEach(item => {
