@@ -40,12 +40,12 @@ const LIMIT_DARKRED = 100
 const LIMIT_RED = 50
 const LIMIT_ORANGE = 35
 const LIMIT_YELLOW = 25
-const LIMIT_DARKRED_COLOR = new Color('a1232b')
-const LIMIT_RED_COLOR = new Color('f6000f')
-const LIMIT_ORANGE_COLOR = new Color('ff7927')
-const LIMIT_YELLOW_COLOR = new Color('F5D800')
-const LIMIT_GREEN_COLOR = new Color('1CC747')
-const LIMIT_GRAY_COLOR = new Color('d0d0d0')
+const LIMIT_DARKRED_COLOR = new Color('#a1232b')
+const LIMIT_RED_COLOR = new Color('#f6000f')
+const LIMIT_ORANGE_COLOR = new Color('#ff7927')
+const LIMIT_YELLOW_COLOR = new Color('#F5D800')
+const LIMIT_GREEN_COLOR = new Color('#1CC747')
+const LIMIT_GRAY_COLOR = new Color('#d0d0d0')
 const BUNDESLAENDER_SHORT = {
     'Baden-Württemberg': 'BW',
     'Bayern': 'BY',
@@ -76,6 +76,12 @@ if (args.widgetParameter) {
     if (typeof staticCoordinates[1] !== 'undefined' && Object.keys(staticCoordinates[1]).length >= 3) {
         MEDIUMWIDGET = true
     }
+} else { // DEBUG MEDIUM WIDGET
+    // fixedCoordinates[0] = { index: 0, latitude: 48.1430, longitude: 11.5650, name: false }
+    // fixedCoordinates[1] = { index: 1, latitude: 48.24670, longitude: 12.52155, name: 'Work' }
+    // fixedCoordinates[0] = { index: 0, latitude: 48.13743, longitude: 11.57549, name: false }
+    // fixedCoordinates[1] = { index: 1, latitude: 53.551086, longitude: 9.993682, name: 'Home' }
+    // MEDIUMWIDGET = true
 }
 
 let cache = {}
@@ -430,6 +436,7 @@ async function getData(useStaticCoordsIndex = false) {
         }
         return await saveLoadData(attr.RS, res)
     } catch (e) {
+        log(e)
         return null
     }
 }
