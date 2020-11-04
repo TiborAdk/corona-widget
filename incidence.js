@@ -20,14 +20,14 @@ const apiRUrl = `https://www.rki.de/DE/Content/InfAZ/N/Neuartiges_Coronavirus/Pr
 
 /**
  * Fix Coordinates/MediumWidget
- * Set Widgetparameter for each column, seperated by ";" Format: POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)
+ * Set Widgetparameter for each column, separated by ";" Format: POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)
  *
  * Examples:
  *
  * First fix column (No second column): 0,51.1244,6.7353
- * Second fix column (Second column is visble, MediumWidget): 1,51.1244,6.7353
- * Both Fix columns (both are visble, MediumWidget): 0,51.1244,6.7353;1,51.1244,6.7353
- * Only Second Fix (both are visble, MediumWidget): 1,51.1244,6.7353
+ * Second fix column (Second column is visible, MediumWidget): 1,51.1244,6.7353
+ * Both Fix columns (both are visible, MediumWidget): 0,51.1244,6.7353;1,51.1244,6.7353
+ * Only Second Fix (both are visible, MediumWidget): 1,51.1244,6.7353
  * Custom Name: 0,51.1244,6.7353,Home
  * Custom Name Second column: 1,51.1244,6.7353,Work
  */
@@ -73,7 +73,7 @@ if (args.widgetParameter) {
 let data = {}
 let weekData = {}
 const widget = await createWidget()
-widget.setPadding(0,0,0,0)
+widget.setPadding(0, 0, 0, 0)
 if (!config.runsInWidget) {
     if (MEDIUMWIDGET) {
         await widget.presentMedium()
@@ -93,22 +93,22 @@ async function createWidget() {
         let todayData = getDataForDate(data)
         addLabelTo(headerRow, 'R ' + formatNumber(todayData.r), Font.mediumSystemFont(14))
         headerRow.addSpacer()
-    
+
         let chartdata = getChartData(data, 'averageIncidence');
         // chartdata = [4,13,25,31,45,55,60] // DEMO!!!
-        addChartBlockTo(headerRow, getGetLastCasesAndTrend(data, 'cases'), chartdata, false)
-        
+        addChartBlockTo(headerRow, getGetLastCasesAndTrend(data, 'cases'), chartdata, ALIGN_RIGHT)
+
         list.addSpacer(3)
 
         const incidenceRow = list.addStack()
         incidenceRow.layoutHorizontally()
         incidenceRow.centerAlignContent()
-    
+
         let padding = (MEDIUMWIDGET) ? 5 : 10
-        addIncidenceBlockTo(incidenceRow, data, [2,10,10,padding], 0)
+        addIncidenceBlockTo(incidenceRow, data, [2, 10, 10, padding], 0)
         if (MEDIUMWIDGET) {
             const data1 = await getData(1)
-            addIncidenceBlockTo(incidenceRow, data1, [2,padding,10,10], 1)
+            addIncidenceBlockTo(incidenceRow, data1, [2, padding, 10, 10], 1)
         }
         if (CONFIG_OPEN_URL) list.url = "https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4"
         list.refreshAfterDate = new Date(Date.now() + 60 * 60 * 1000)
@@ -138,7 +138,7 @@ function getGetLastCasesAndTrend(data, field, calcDiff = false, fromBL = false) 
         if (fromBL) yesterdayCases = getBLCases(yesterdayData.incidencePerState, yesterdayData.nameBL)
     }
     // BEFOREYESTERDAY
-            
+
     let beforeYesterdayData = getDataForDate(data, 2)
     if (beforeYesterdayData) {
         beforeYesterdayCases = beforeYesterdayData[field];
@@ -150,7 +150,7 @@ function getGetLastCasesAndTrend(data, field, calcDiff = false, fromBL = false) 
     } else {
         casesTrendStr = '+' + formatNumber(todayCases);
     }
-    
+
     if (todayCases && yesterdayCases !== false && beforeYesterdayCases !== false) {
         casesTrendStr += getTrendArrow(todayCases - yesterdayCases, yesterdayCases - beforeYesterdayCases)
     }
@@ -162,7 +162,7 @@ function getBLCases(states, BL) {
         let state = states.filter(item => {
             return (item.BL === BL)
         }).pop()
-        return state.cases    
+        return state.cases
     }
     return 0
 }
@@ -180,13 +180,13 @@ function addIncidenceBlockTo(view, data, padding, useStaticCoordsIndex) {
     const incidenceBlockBox = view.addStack()
     incidenceBlockBox.setPadding(padding[0], 0, padding[2], 0)
     incidenceBlockBox.layoutHorizontally()
-    
+
     incidenceBlockBox.addSpacer(padding[1])
-    
+
     const incidenceBlockRows = incidenceBlockBox.addStack()
 
     incidenceBlockRows.backgroundColor = new Color('cccccc', 0.1)
-    incidenceBlockRows.setPadding(0,0,0,0)
+    incidenceBlockRows.setPadding(0, 0, 0, 0)
     incidenceBlockRows.cornerRadius = 14
     incidenceBlockRows.layoutVertically()
 
@@ -195,7 +195,7 @@ function addIncidenceBlockTo(view, data, padding, useStaticCoordsIndex) {
     incidenceBlockRows.addSpacer(2)
 
     incidenceBlockBox.addSpacer(padding[3])
-    
+
     return incidenceBlockBox;
 }
 
@@ -204,11 +204,11 @@ function addIncidence(view, data, useStaticCoordsIndex = false) {
     const yesterdayData = getDataForDate(data, 1)
 
     const incidenceBox = view.addStack()
-    incidenceBox.setPadding(6,8,6,8)
+    incidenceBox.setPadding(6, 8, 6, 8)
     incidenceBox.cornerRadius = 12
     incidenceBox.backgroundColor = new Color('999999', 0.1)
     incidenceBox.layoutHorizontally()
-    
+
     const stackMainRowBox = incidenceBox.addStack()
     stackMainRowBox.layoutVertically()
     stackMainRowBox.addSpacer(0)
@@ -226,7 +226,7 @@ function addIncidence(view, data, useStaticCoordsIndex = false) {
     // === INCIDENCE
     const incidence = (todayData.incidence >= 100) ? Math.round(todayData.incidence) : todayData.incidence;
     addLabelTo(stackMainRow, formatNumber(incidence), Font.boldSystemFont(27), getIncidenceColor(incidence))
-    
+
     if (yesterdayData) {
         const incidenceTrend = getTrendArrow(todayData.incidence, yesterdayData.incidence);
         const incidenceLabelColor = (incidenceTrend === '↑') ? LIMIT_RED_COLOR : (incidenceTrend === '↓') ? LIMIT_GREEN_COLOR : new Color('999999')
@@ -239,7 +239,7 @@ function addIncidence(view, data, useStaticCoordsIndex = false) {
     incidenceBLStack.layoutVertically()
     incidenceBLStack.backgroundColor = new Color('dfdfdf')
     incidenceBLStack.cornerRadius = 4
-    incidenceBLStack.setPadding(2,3,2,3)
+    incidenceBLStack.setPadding(2, 3, 2, 3)
 
     let incidenceBL = (todayData.incidenceBL >= 100) ? Math.round(todayData.incidenceBL) : todayData.incidenceBL;
     incidenceBL = formatNumber(incidenceBL)
@@ -277,12 +277,12 @@ function getTrendArrow(value1, value2) {
 
 function addTrendsBarToIncidenceBlock(view, data) {
     const trendsBarBox = view.addStack()
-    trendsBarBox.setPadding(3,8,3,8)
+    trendsBarBox.setPadding(3, 8, 3, 8)
     trendsBarBox.layoutHorizontally()
     let chartdata = getChartData(data, 'incidence')
     // chartdata = [4,32,40,50,101,55,20] // DEMO!!!
-    addChartBlockTo(trendsBarBox, getGetLastCasesAndTrend(data, 'areaCases', true), chartdata, true)
-    trendsBarBox.addSpacer()    
+    addChartBlockTo(trendsBarBox, getGetLastCasesAndTrend(data, 'areaCases', true), chartdata, ALIGN_LEFT)
+    trendsBarBox.addSpacer()
     let chartdataBL = getChartData(data, 'incidenceBL')
     // chartdataBL = [4,28,35,51,75,105,60] // DEMO!!!
     addChartBlockTo(trendsBarBox, getGetLastCasesAndTrend(data, 'cases', true, true), chartdataBL, false)
@@ -290,7 +290,7 @@ function addTrendsBarToIncidenceBlock(view, data) {
 
 function addHeaderRowTo(view) {
     const headerRow = view.addStack()
-    headerRow.setPadding(8,8,4,8)
+    headerRow.setPadding(8, 8, 4, 8)
     headerRow.centerAlignContent()
     const headerIcon = headerRow.addText("🦠")
     headerIcon.font = Font.mediumSystemFont(16)
@@ -348,8 +348,9 @@ async function getData(useStaticCoordsIndex = false) {
     let rValue = 0
     try {
         rValue = await getRValue()
-    } catch(e){}
-  
+    } catch (e) {
+    }
+
     try {
         let dataCases = await new Request(apiUrlNewCases).loadJSON()
         const cases = dataCases.features[0].attributes.value
@@ -392,8 +393,8 @@ async function getRValue() {
         if (typeof item['Schätzer_7_Tage_R_Wert'] !== 'undefined' && parseFloat(item['Schätzer_7_Tage_R_Wert']) > 0) {
             lastR = item;
         }
-    })    
-    return (lastR) ? parseFloat(lastR['Schätzer_7_Tage_R_Wert'].replace(',','.')) : lastR
+    })
+    return (lastR) ? parseFloat(lastR['Schätzer_7_Tage_R_Wert'].replace(',', '.')) : lastR
 }
 
 function getIncidenceColor(incidence) {
@@ -412,7 +413,7 @@ function getIncidenceColor(incidence) {
     return color
 }
 
-function parseInput (input) {
+function parseInput(input) {
     const _coords = []
     const _staticCoordinates = input.split(";").map(coords => {
         return coords.split(',')
@@ -451,9 +452,11 @@ async function saveLoadData (dataId, data) {
     lastDaysKeys.forEach(key => {
         loadedDataLimited[key] = loadedData[key]
     })
-    let fm = getFilemanager()
-    let path = fm.joinPath(fm.documentsDirectory(), 'coronaWidget' + dataId + '.json')
-    fm.writeString(path, JSON.stringify(loadedDataLimited))
+
+    // let fm = getFilemanager()
+    // let path = fm.joinPath(fm.documentsDirectory(), 'coronaWidget' + dataId + '.json')
+    // fm.writeString(path, JSON.stringify(loadedDataLimited))
+    await storeData(dataId, loadedDataLimited)
     return loadedData
 }
 
@@ -474,24 +477,26 @@ async function loadData(dataId, oldAreaName) {
 }
 
 function getFilemanager() {
-    let fm 
+    let fm
     try {
         fm = FileManager.iCloud()
     } catch (e) {
         fm = FileManager.local()
     }
-    
+
     // check if user logged in iCloud
-    try { 
+    try {
         fm.documentsDirectory()
-    } catch(e) {
+    } catch (e) {
         fm = FileManager.local()
     }
     return fm
 }
 
 function parseRCSV(rDataStr) {
-    let lines = rDataStr.split(/(?:\r\n|\n)+/).filter(function(el) {return el.length != 0});
+    let lines = rDataStr.split(/(?:\r\n|\n)+/).filter(function (el) {
+        return el.length !== 0
+    });
     let headers = lines.splice(0, 1)[0].split(";");
     let valuesRegExp = /(?:\"([^\"]*(?:\"\"[^\"]*)*)\")|([^\";]+)/g;
     let elements = [];
