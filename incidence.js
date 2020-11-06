@@ -84,7 +84,7 @@ const BUNDESLAENDER_SHORT = {
     'Thüringen': 'TH'
 };
 
-let MEDIUMWIDGET = (config.widgetFamily === 'medium') ? true : false
+let MEDIUMWIDGET = config.widgetFamily === 'medium'
 let staticCoordinates = []
 if (args.widgetParameter) {
     staticCoordinates = parseInput(args.widgetParameter)
@@ -129,7 +129,8 @@ class IncidenceWidget {
             headerRow.addSpacer(3)
 
             let todayData = getDataForDate(data, 0)
-            addLabelTo(headerRow, ('' + todayData.d.r.toFixed(2)).replace('.', ',') + 'ᴿ', Font.mediumSystemFont(14))
+            const rData = todayData.d.r
+            addLabelTo(headerRow, ('' + rData.r.toFixed(2)).replace('.', ',') + 'ᴿ', Font.mediumSystemFont(14))
             headerRow.addSpacer()
 
             let chartdata = getChartData(data, 'd')
@@ -400,7 +401,8 @@ function generateGraph(data, width, height, align = ALIGN_LEFT, zeroTop = false)
 
     data.forEach((item, index) => {
         let value = parseFloat(item.value)
-        value = (value === -1 && index === 0) ? value : 10
+        if (value === -1 && index === 0) value = 10
+
         let h = Math.max(2, Math.round((Math.abs(value) / max) * height))
         let x = xOffset + (w + 1) * index
         let y = (!zeroTop) ? height - h : 0
@@ -552,9 +554,9 @@ function populateDailyCases(data) {
     return data
 }
 
-function limitData(data) {
+function limitData(data, days=CONFIG_MAX_CACHED_DAYS) {
     const dataKeys = Object.keys(data);
-    const lastKeys = dataKeys.slice(Math.max(Object.keys(data).length - CONFIG_MAX_CACHED_DAYS + 1, 0))
+    const lastKeys = dataKeys.slice(Math.max(Object.keys(data).length - days + 1, 0))
     let dataLimited = {}
     lastKeys.forEach(key => {
         dataLimited[key] = data[key]
