@@ -127,29 +127,34 @@ class IncidenceWidget {
         if (dataResponse.status === 200 || dataResponse.status === 418) {
             let data = dataResponse.data
             headerRow.addSpacer(3)
+            const dataGer = data.country
 
-            let todayData = getDataForDate(data, 0)
-            const rData = todayData.d.r
+            let todayData = getDataForDate(dataGer.data, 0)
+            const rData = todayData.r
             addLabelTo(headerRow, ('' + rData.r.toFixed(2)).replace('.', ',') + 'ᴿ', Font.mediumSystemFont(14))
             headerRow.addSpacer()
 
-            let chartdata = getChartData(data, 'd')
-            let chartDataTitle = getGetLastCasesAndTrend(data, 'd')
+            // GER
+            let chartdata = getChartData(dataGer.data)
+            let chartDataTitle = getGetLastCasesAndTrend(dataGer.data)
             addChartBlockTo(headerRow, chartDataTitle, chartdata, ALIGN_RIGHT)
             headerRow.addSpacer(0)
             list.addSpacer(3)
 
+            // AREA0
             const incidenceRow = list.addStack()
             incidenceRow.layoutHorizontally()
             incidenceRow.centerAlignContent()
 
             let padding = (MEDIUMWIDGET) ? 5 : 10
-            addIncidenceBlockTo(incidenceRow, data, [2, 10, 10, padding], 0, dataResponse.status)
+            addIncidenceBlockTo(incidenceRow, data.area, data.state, [2, 10, 10, padding], 0, dataResponse.status)
+
+            // AREA1
             if (MEDIUMWIDGET) {
                 const dataResponse1 = await getData(1)
                 if (dataResponse1.status === 200 || dataResponse1.status === 418) {
                     let data1 = dataResponse1.data
-                    addIncidenceBlockTo(incidenceRow, data1, [2, padding, 10, 10], 1, dataResponse1.status)
+                    addIncidenceBlockTo(incidenceRow, data1.area, data1.state, [2, padding, 10, 10], 1, dataResponse1.status)
                 }
             }
             if (CONFIG_OPEN_URL) list.url = "https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4"
@@ -165,21 +170,21 @@ class IncidenceWidget {
     }
 }
 
-function getGetLastCasesAndTrend(data, property) {
+function getGetLastCasesAndTrend(data) {
     // TODAY
     let casesTrendStr = '';
     let todayData = getDataForDate(data)
-    let todayCases = todayData[property].dailyCases;
+    let todayCases = todayData.dailyCases;
     let yesterdayCases = false
     let beforeYesterdayCases = false
     if (todayCases !== -1) {
         casesTrendStr = '+' + formatNumber(todayCases)
         // YESTERDAY
         let yesterdayData = getDataForDate(data, 1)
-        if (yesterdayData) yesterdayCases = yesterdayData[property].dailyCases;
+        if (yesterdayData) yesterdayCases = yesterdayData.dailyCases;
         // BEFOREYESTERDAY
         let beforeYesterdayData = getDataForDate(data, 2)
-        if (beforeYesterdayData) beforeYesterdayCases = beforeYesterdayData[property].dailyCases;
+        if (beforeYesterdayData) beforeYesterdayCases = beforeYesterdayData.dailyCases;
         if (todayCases && yesterdayCases !== false && beforeYesterdayCases !== false) {
             casesTrendStr += getTrendUpArrow(todayCases - yesterdayCases, yesterdayCases - beforeYesterdayCases)
         }
@@ -189,48 +194,48 @@ function getGetLastCasesAndTrend(data, property) {
     return casesTrendStr
 }
 
-function getChartData(data, property) {
+function getChartData(data) {
     const allKeys = Object.keys(data).reverse()
     const chartdata = new Array(CONFIG_GRAPH_SHOW_DAYS).fill({value: 0, incidence: 0});
     allKeys.forEach((key, index) => {
         if (typeof chartdata[CONFIG_GRAPH_SHOW_DAYS - 1 - index] !== 'undefined') {
             chartdata[CONFIG_GRAPH_SHOW_DAYS - 1 - index] = {
-                value: data[key][property]['dailyCases'],
-                incidence: data[key][property]['incidence']
+                value: data[key]['dailyCases'],
+                incidence: data[key]['incidence']
             }
         }
     })
     return chartdata
 }
 
-function addIncidenceBlockTo(view, data, padding, useStaticCoordsIndex, status = 200) {
+function addIncidenceBlockTo(view, area, state, padding, useStaticCoordsIndex, status = 200) {
     const incidenceBlockBox = view.addStack()
     incidenceBlockBox.setPadding(padding[0], 0, padding[2], 0)
     incidenceBlockBox.layoutHorizontally()
     incidenceBlockBox.addSpacer(padding[1])
 
     const incidenceBlockRows = incidenceBlockBox.addStack()
-    incidenceBlockRows.backgroundColor = new Color('cccccc', 0.1)
+    incidenceBlockRows.backgroundColor = new Color('#cccccc', 0.1)
     incidenceBlockRows.setPadding(0, 0, 0, 0)
     incidenceBlockRows.cornerRadius = 14
     incidenceBlockRows.layoutVertically()
 
-    addIncidence(incidenceBlockRows, data, useStaticCoordsIndex, status)
-    addTrendsBarToIncidenceBlock(incidenceBlockRows, data)
+    addIncidence(incidenceBlockRows, area, state, useStaticCoordsIndex, status)
+    addTrendsBarToIncidenceBlock(incidenceBlockRows, area, state)
     incidenceBlockRows.addSpacer(2)
     incidenceBlockBox.addSpacer(padding[3])
 
     return incidenceBlockBox;
 }
 
-function addIncidence(view, data, useStaticCoordsIndex = false, status = 200) {
-    const todayData = getDataForDate(data)
-    const yesterdayData = getDataForDate(data, 1)
+function addIncidence(view, area, state, useStaticCoordsIndex = false, status = 200) {
+    const todayDataArea = getDataForDate(area.data)
+    const yesterdayDataArea = getDataForDate(area.data, 1)
 
     const incidenceBox = view.addStack()
     incidenceBox.setPadding(6, 8, 6, 8)
     incidenceBox.cornerRadius = 12
-    incidenceBox.backgroundColor = new Color('999999', 0.1)
+    incidenceBox.backgroundColor = new Color('#999999', 0.1)
     incidenceBox.layoutHorizontally()
 
     const stackMainRowBox = incidenceBox.addStack()
@@ -238,10 +243,10 @@ function addIncidence(view, data, useStaticCoordsIndex = false, status = 200) {
     stackMainRowBox.addSpacer(0)
 
     if (useStaticCoordsIndex === 0 && status === 200) {
-        addLabelTo(stackMainRowBox, todayData.updated.substr(0, 10), Font.mediumSystemFont(10), new Color('888888'))
+        addLabelTo(stackMainRowBox, todayDataArea.updated.substr(0, 10), Font.mediumSystemFont(10), new Color('#888888'))
         stackMainRowBox.addSpacer(0)
     } else if (useStaticCoordsIndex === 0 && status === 418) {
-        addLabelTo(stackMainRowBox, '⚡️ Offlinemodus!', Font.mediumSystemFont(10), new Color('dbc43d'))
+        addLabelTo(stackMainRowBox, '⚡️ Offlinemodus!', Font.mediumSystemFont(10), new Color('#dbc43d'))
         stackMainRowBox.addSpacer(0)
     } else {
         stackMainRowBox.addSpacer(10)
@@ -250,32 +255,35 @@ function addIncidence(view, data, useStaticCoordsIndex = false, status = 200) {
     stackMainRow.centerAlignContent()
 
     // === INCIDENCE
-    const incidence = (todayData.area.incidence >= 100) ? Math.round(todayData.area.incidence) : todayData.area.incidence;
+    const incidence = (todayDataArea.incidence >= 100) ? Math.round(todayDataArea.incidence) : todayDataArea.incidence;
     addLabelTo(stackMainRow, formatNumber(incidence), Font.boldSystemFont(27), getIncidenceColor(incidence))
 
-    if (yesterdayData) {
-        const incidenceTrend = getTrendArrow(todayData.area.incidence, yesterdayData.area.incidence);
-        const incidenceLabelColor = (incidenceTrend === '↑') ? LIMIT_RED_COLOR : (incidenceTrend === '↓') ? LIMIT_GREEN_COLOR : new Color('999999')
+    if (yesterdayDataArea) {
+        const incidenceTrend = getTrendArrow(todayDataArea.incidence, yesterdayDataArea.incidence);
+        const incidenceLabelColor = (incidenceTrend === '↑') ? LIMIT_RED_COLOR : (incidenceTrend === '↓') ? LIMIT_GREEN_COLOR : new Color('#999999')
         addLabelTo(stackMainRow, incidenceTrend, Font.boldSystemFont(27), incidenceLabelColor)
     }
     stackMainRow.addSpacer(4)
 
     // === BL INCIDENCE
+    const todayDataState = getDataForDate(state.data)
+    const yesterdayDataState = getDataForDate(state.data, 1)
+
     const incidenceBLStack = stackMainRow.addStack();
     incidenceBLStack.layoutVertically()
-    incidenceBLStack.backgroundColor = new Color('dfdfdf')
+    incidenceBLStack.backgroundColor = new Color('#dfdfdf')
     incidenceBLStack.cornerRadius = 4
     incidenceBLStack.setPadding(2, 3, 2, 3)
 
-    let incidenceBL = (todayData.state.incidence >= 100) ? Math.round(todayData.state.incidence) : todayData.state.incidence;
+    let incidenceBL = (todayDataState.incidence >= 100) ? Math.round(todayDataState.incidence) : todayDataState.incidence;
     incidenceBL = formatNumber(incidenceBL)
-    if (yesterdayData) {
-        incidenceBL += getTrendArrow(todayData.state.incidence, yesterdayData.state.incidence)
+    if (yesterdayDataState) {
+        incidenceBL += getTrendArrow(todayDataState.incidence, yesterdayDataState.incidence)
     }
-    addLabelTo(incidenceBLStack, incidenceBL, Font.mediumSystemFont(9), '444444')
-    addLabelTo(incidenceBLStack, todayData.state.name, Font.mediumSystemFont(9), '444444')
+    addLabelTo(incidenceBLStack, incidenceBL, Font.mediumSystemFont(9), '#444444')
+    addLabelTo(incidenceBLStack, state.name, Font.mediumSystemFont(9), '#444444')
 
-    let areaName = todayData.area.name
+    let areaName = area.name
     if (typeof staticCoordinates[useStaticCoordsIndex] !== 'undefined' && staticCoordinates[useStaticCoordsIndex].name !== false) {
         areaName = staticCoordinates[useStaticCoordsIndex].name
     }
@@ -304,14 +312,16 @@ function getTrendArrow(value1, value2) {
     return (value1 < value2) ? '↓' : (value1 > value2) ? '↑' : '→'
 }
 
-function addTrendsBarToIncidenceBlock(view, data) {
+function addTrendsBarToIncidenceBlock(view, area, state) {
     const trendsBarBox = view.addStack()
     trendsBarBox.setPadding(3, 8, 3, 8)
     trendsBarBox.layoutHorizontally()
 
     // AREA TREND
-    let chartdata = getChartData(data, 'area')
-    let chartDataTitle = getGetLastCasesAndTrend(data, 'area')
+    let chartdata = getChartData(area.data)
+    console.log(area.data)
+    console.log(chartdata)
+    let chartDataTitle = getGetLastCasesAndTrend(area.data)
     /*DEMO!!!! chartdata = [
         {incidence: 0, value: 0},
         {incidence: 10, value: 10},
@@ -328,12 +338,12 @@ function addTrendsBarToIncidenceBlock(view, data) {
         {incidence: 10, value: 20},
         {incidence: 30, value: 30},
     ]*/
-    addChartBlockTo(trendsBarBox, chartDataTitle, chartdata, true)
+    addChartBlockTo(trendsBarBox, chartDataTitle, chartdata, ALIGN_LEFT)
     trendsBarBox.addSpacer()
 
     // STATE TREND
-    let chartdataBL = getChartData(data, 'state')
-    let chartDataBLTitle = getGetLastCasesAndTrend(data, 'state')
+    let chartdataBL = getChartData(state.data)
+    let chartDataBLTitle = getGetLastCasesAndTrend(state.data)
     /* DEMO!!!! chartdataBL = [
         {incidence: 0, value: 0},
         {incidence: 20, value: 20},
@@ -350,7 +360,7 @@ function addTrendsBarToIncidenceBlock(view, data) {
         {incidence: 40, value: 60},
         {incidence: 30, value: 20}
     ]*/
-    addChartBlockTo(trendsBarBox, chartDataBLTitle, chartdataBL, false)
+    addChartBlockTo(trendsBarBox, chartDataBLTitle, chartdataBL, ALIGN_RIGHT)
 }
 
 function addHeaderRowTo(view) {
@@ -457,7 +467,7 @@ async function getData(useStaticCoordsIndex = false) {
 
     let cases = -1
     try {
-        let dataCases = await new Request(apiUrlNewCases).loadJSON()
+        let dataCases = await cachedRequest(apiUrlNewCases, 'json')
         cases = dataCases.features[0].attributes.value
     } catch (e) {
         console.warn(e)
@@ -469,44 +479,88 @@ async function getData(useStaticCoordsIndex = false) {
         let data = await cachedRequest(apiUrl(location), 'json')
         const attr = data.features[0].attributes
 
+        const area = {
+            name: attr.GEN,
+            rs: attr.RS,
+            data: {
+                incidence: parseFloat(attr.cases7_per_100k.toFixed(1)),
+                dailyCases: -1,
+                areaCases: parseFloat(attr.cases.toFixed(1)),
+                updated: attr.last_update,
+                updatedTS: getTimestamp(attr.last_update)
+            }
+        }
+
+        const preparedDataArea = await prepareData(area.rs, area.name, area.data)
+        if (preparedDataArea.status === 200) {
+            area.data = preparedDataArea.data
+            saveData(area.rs, area)
+        }
+
         // STATES DATA
         let dataStates = await cachedRequest(apiUrlStates, 'json')
         const allStatesData = dataStates.features.map((f) => {
             return {
                 BL: BUNDESLAENDER_SHORT[f.attributes.LAN_ew_GEN],
                 incidence: f.attributes.cases7_bl_per_100k,
-                cases: f.attributes.Fallzahl
+                cases: f.attributes.Fallzahl,
+                updated: attr.last_update,
+                updatedTS: getTimestamp(attr.last_update)
             }
         })
+
         const statesData = getStateData(allStatesData, BUNDESLAENDER_SHORT[attr.BL])
         const averageIncidence = allStatesData.reduce((a, b) => a + b.incidence, 0) / allStatesData.length
 
-        // FORMATTED DATA
-        const res = {
-            area: {
-                incidence: parseFloat(attr.cases7_per_100k.toFixed(1)),
-                name: attr.GEN,
-                dailyCases: -1,
-                areaCases: parseFloat(attr.cases.toFixed(1)),
-            },
-            state: {
+        const state = {
+            name: BUNDESLAENDER_SHORT[attr.BL],
+            data: {
                 incidence: parseFloat(statesData.incidence.toFixed(1)),
-                name: BUNDESLAENDER_SHORT[attr.BL],
                 cases: statesData.cases,
-                dailyCases: -1
-            },
-            d: {
+                dailyCases: -1,
+                updated: attr.last_update,
+                updatedTS: getTimestamp(attr.last_update)
+            }
+        }
+
+        const preparedDataState = await prepareData(state.name, 'NOTHING', state.data)
+        if (preparedDataState.status === 200) {
+            state.data = preparedDataState.data
+            saveData(state.name, state)
+        }
+
+        const country = {
+            name: 'GER',
+            data: {
                 incidence: parseFloat(averageIncidence.toFixed(1)),
                 dailyCases: cases,
-                r: rValue
-            },
+                r: rValue,
+                updated: attr.last_update,
+                updatedTS: getTimestamp(attr.last_update),
+            }
+        }
+
+        const preparedDataCountry = await prepareData('GER', 'NOTHING', country.data, false)
+        if (preparedDataCountry.status === 200) {
+            country.data = preparedDataCountry.data
+            saveData('GER', country)
+        }
+
+        // FORMATTED DATA
+        const res = {
+            area: area,
+            state: state,
+            country: country,
             updated: attr.last_update,
             updatedTS: getTimestamp(attr.last_update),
-            rs: attr.RS,
         }
-        const preparedDataResponse = await prepareData(attr.RS, attr.GEN, res)
-        if (preparedDataResponse.status === 200) saveData(attr.RS, preparedDataResponse.data)
-        return preparedDataResponse
+        //const preparedDataResponse = await prepareData(attr.RS, attr.GEN, res)
+        //if (preparedDataResponse.status === 200) saveData(attr.RS, preparedDataResponse.data)
+        if (preparedDataArea.status === 200 && preparedDataState.status === 200 && preparedDataCountry.status === 200) {
+            return new DataResponse(res, 200)
+        } else {
+            return new DataResponse({}, 404)
+        }
     } catch (e) {
         console.warn(e)
         if (typeof staticCoordinates[useStaticCoordsIndex] !== 'undefined' && staticCoordinates[useStaticCoordsIndex].cacheId) {
@@ -520,21 +574,25 @@ async function getData(useStaticCoordsIndex = false) {
     return new DataResponse({}, 404)
 }
 
-async function prepareData(dataId, oldAreaName, newData) {
-    await migrateDataFiles(dataId, oldAreaName)
+async function prepareData(dataId, oldAreaName, newData, calcDailyCases = true) {
+    //await migrateDataFiles(dataId, oldAreaName)
+
     const dataResponse = await loadData(dataId)
     let data = {}
     if (dataResponse.status === 200) {
-        const migratedData = migrateData(dataResponse.data)
-        if (Object.keys(migratedData).length > 0) {
-            data = migratedData;
-        } else {
-            data = dataResponse.data
-        }
+        // const migratedData = migrateData(dataResponse.data)
+        // if (Object.keys(migratedData).length > 0) {
+        //     data = migratedData;
+        // } else {
+        //     data = dataResponse.data
+        // }
+
+        // 1st data: get data from response object, 2nd data: get field `data` from stored object
+        if (typeof dataResponse.data.data !== 'undefined') data = dataResponse.data.data
     }
     data[newData.updated.substr(0, 10)] = newData
     data = limitData(data)
-    data = populateDailyCases(data);
+    if (calcDailyCases) data = populateDailyCases(data);
     return new DataResponse(data)
 }
 
@@ -542,13 +600,17 @@ function populateDailyCases(data) {
     const keys = Object.keys(data).reverse()
     keys.forEach((key) => {
         let yesterday = new Date(data[key].updatedTS - (60 * 60 * 24) * 1000)
-        let yesterdayKey = `${(''+yesterday.getDate()).padStart(2, '0')}.${(''+(yesterday.getMonth() + 1)).padStart(2, '0')}.${yesterday.getFullYear()}`
-        if (typeof data[yesterdayKey] !== 'undefined') {
-            data[key].area.dailyCases = data[key].area.areaCases - data[yesterdayKey].area.areaCases
-            data[key].state.dailyCases = data[key].state.cases - data[yesterdayKey].state.cases
+        let yesterdayKey = `${('' + yesterday.getDate()).padStart(2, '0')}.${('' + (yesterday.getMonth() + 1)).padStart(2, '0')}.${yesterday.getFullYear()}`
+        let keyCases
+        if (typeof data[key].areaCases !== 'undefined') {
+            keyCases = 'areaCases'
         } else {
-            if (data[key].area.dailyCases === null) data[key].area.dailyCases = -1
-            if (data[key].state.dailyCases === null) data[key].state.dailyCases = -1
+            keyCases = 'cases'
+        }
+        if (typeof data[yesterdayKey] !== 'undefined') {
+            data[key].dailyCases = data[key][keyCases] - data[yesterdayKey][keyCases]
+        } else {
+            if (data[key].dailyCases === null) data[key].dailyCases = -1
         }
     });
     return data
@@ -556,7 +618,7 @@ function populateDailyCases(data) {
 
 function limitData(data, days=CONFIG_MAX_CACHED_DAYS) {
     const dataKeys = Object.keys(data);
-    const lastKeys = dataKeys.slice(Math.max(Object.keys(data).length - days + 1, 0))
+    const lastKeys = dataKeys.slice(Math.max(Object.keys(data).length - days, 0))
     let dataLimited = {}
     lastKeys.forEach(key => {
         dataLimited[key] = data[key]
