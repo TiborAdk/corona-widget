@@ -8,20 +8,21 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  * BASE VERSION FORKED FROM AUTHOR: kevinkub https://gist.github.com/kevinkub/46caebfebc7e26be63403a7f0587f664/c5db6e2c1c45a41bdd4a85990c0d0b883915b3c3
- * THIS VERSION (AUTHOR: https://github.com/rphl) https://github.com/rphl/corona-widget/
+ * FORKED FROM THIS VERSION (AUTHOR: https://github.com/rphl) https://github.com/rphl/corona-widget/
+ * THIS VERSION (AUTHOR: https://github.com/TiborAdk) https://github.com/TiborAdk/corona-widget
  *
  *
  * Widgetparamter:
  *
  * Fix Coordinates/MediumWidget:
- * Set Widgetparameter for each column, seperated by ";" Format: POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)
+ * Set Widgetparameter for each column, separated by ";" Format: POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)
  *
  * Examples:
  *
  * First fix column (No second column): 0,51.1244,6.7353
- * Second fix column (Second column is visble, MediumWidget): 1,51.1244,6.7353
- * Both Fix columns (both are visble, MediumWidget): 0,51.1244,6.7353;1,51.1244,6.7353
- * Only Second Fix (both are visble, MediumWidget): 1,51.1244,6.7353
+ * Second fix column (Second column is visible, MediumWidget): 1,51.1244,6.7353
+ * Both Fix columns (both are visible, MediumWidget): 0,51.1244,6.7353;1,51.1244,6.7353
+ * Only Second Fix (both are visible, MediumWidget): 1,51.1244,6.7353
  * Custom Name: 0,51.1244,6.7353,Home
  * Custom Name Second column: 1,51.1244,6.7353,Work
  *
@@ -40,8 +41,9 @@
 const CONFIG_OPEN_URL = false // open RKI dashboard on tap
 const CONFIG_SHOW_AREA_ICON = true // show "Icon" before AreaName: Like KS = Kreisfreie Stadt, LK = Landkreis,...
 const CONFIG_GRAPH_SHOW_DAYS = 14
-const CONFIG_MAX_CACHED_DAYS = 14 // WARNING!!! Smaller values will delete saved days > CONFIG_MAX_CACHED_DAYS. Backup JSON first ;-)
+const CONFIG_MAX_CACHED_DAYS = 21 // WARNING!!! Smaller values will delete saved days > CONFIG_MAX_CACHED_DAYS. Backup JSON first ;-)
 const CONFIG_CSV_RVALUE_FIELD = 'Schätzer_7_Tage_R_Wert' // numbered field (column), because of possible encoding changes in columns names on each update
+const CONFIG_REFRESH_INTERVAL = 3600
 
 // ============= ============= =============
 
@@ -101,8 +103,7 @@ if (args.widgetParameter) {
 }
 
 let cache = {}
-
-var fm = getFileManager()
+let fm = getFileManager()
 let fmConfigDirectory = fm.joinPath(fm.documentsDirectory(), '/coronaWidget')
 let data = {}
 
@@ -139,7 +140,7 @@ class IncidenceWidget {
 
             // GER
             let chartdata = getChartData(dataGer.data)
-            let chartDataTitle = getGetLastCasesAndTrend(dataGer.data)
+            let chartDataTitle = getLastCasesAndTrend(dataGer.data)
             addChartBlockTo(headerRow, chartDataTitle, chartdata, ALIGN_RIGHT)
             headerRow.addSpacer(0)
             list.addSpacer(3)
@@ -173,7 +174,7 @@ class IncidenceWidget {
     }
 }
 
-function getGetLastCasesAndTrend(data) {
+function getLastCasesAndTrend(data) {
     // TODAY
     let casesTrendStr = '';
     let todayData = getDataForDate(data)
@@ -224,7 +225,7 @@ function addIncidenceBlockTo(view, area, state, padding, useStaticCoordsIndex, s
     incidenceBlockRows.layoutVertically()
 
     addIncidence(incidenceBlockRows, area, state, useStaticCoordsIndex, status)
-    addTrendsBarToIncidenceBlock(incidenceBlockRows, area, state)
+    addTrendsBarToIncidenceBlock(incidenceBlockRows, area.data, state.data)
     incidenceBlockRows.addSpacer(2)
     incidenceBlockBox.addSpacer(padding[3])
 
@@ -292,6 +293,7 @@ function addIncidence(view, area, state, useStaticCoordsIndex = false, status = 
     areaNameStack.setPadding(0,0,0,0)
     areaNameStack.centerAlignContent()
 
+    let areaNameFontSize = 14
     let areaIcon = getAreaIcon(area.areaIBZ)
     if (areaIcon && CONFIG_SHOW_AREA_ICON) {
         let areaNameIconBox = areaNameStack.addStack()
@@ -302,6 +304,8 @@ function addIncidence(view, area, state, useStaticCoordsIndex = false, status = 
         let areaIconLabel = areaNameIconBox.addText(areaIcon)
         areaIconLabel.font = Font.mediumSystemFont(9)
         areaNameStack.addSpacer(3)
+
+        areaNameFontSize = 12
     }
 
     let areaName = area.name
@@ -309,8 +313,8 @@ function addIncidence(view, area, state, useStaticCoordsIndex = false, status = 
         areaName = staticCoordinates[useStaticCoordsIndex].name
     }
     areaName = areaName.toUpperCase().padEnd(50, ' ')
-    const areanameLabel = addLabelTo(areaNameStack, areaName, Font.mediumSystemFont(14))
-    areanameLabel.lineLimit = 1
+    const areaNameLabel = addLabelTo(areaNameStack, areaName, Font.mediumSystemFont(areaNameFontSize))
+    areaNameLabel.lineLimit = 1
     areaNameStack.addSpacer()
     stackMainRowBox.addSpacer(0)
 }
@@ -347,23 +351,27 @@ function getTrendUpArrow(now, prev) {
     return (now < prev) ? '↗' : (now > prev) ? '↑' : '→'
 }
 
-function addTrendsBarToIncidenceBlock(view, area, state) {
+function getTrendArrow(value1, value2) {
+    return (value1 < value2) ? '↓' : (value1 > value2) ? '↑' : '→'
+}
+
+function addTrendsBarToIncidenceBlock(view, dataArea, dataState) {
     const trendsBarBox = view.addStack()
     trendsBarBox.setPadding(3, 8, 3, 8)
     trendsBarBox.layoutHorizontally()
 
     // AREA TREND
-    let chartdata = getChartData(data, 'area')
-    let chartDataTitle = getGetLastCasesAndTrend(data, 'area')
+    let chartdata = getChartData(dataArea)
+    let chartDataTitle = getLastCasesAndTrend(dataArea)
     /*DEMO!!!! chartdata = [{incidence: 0, value: 0},{incidence: 10, value: 10}{incidence: 20, value: 20},{incidence: 30, value: 30},{incidence: 40, value: 40},{incidence: 50, value: 50},{incidence: 70, value: 70},{incidence: 100, value: 100},{incidence: 60, value: 60},{incidence: 70, value: 70},{incidence: 39, value: 39},{incidence: 20, value: 25},{incidence: 10, value: 20},{incidence: 30, value: 30},]*/
-    addChartBlockTo(trendsBarBox, chartDataTitle, chartdata, true)
+    addChartBlockTo(trendsBarBox, chartDataTitle, chartdata, ALIGN_LEFT)
     trendsBarBox.addSpacer()
 
     // STATE TREND
-    let chartdataBL = getChartData(data, 'state')
-    let chartDataBLTitle = getGetLastCasesAndTrend(data, 'state')
+    let chartdataBL = getChartData(dataState)
+    let chartDataBLTitle = getLastCasesAndTrend(dataState)
     /* DEMO!!!! chartdataBL = [{incidence: 0, value: 0},{incidence: 20, value: 20},{incidence: 40, value: 40},{incidence: 50, value: 50},{incidence: 70, value: 70},{incidence: 100, value: 100},{incidence: 110, value: 110},{incidence: 77, value: 77},{incidence: 70, value: 70},{incidence: 39, value: 39},{incidence: 30, value: 40},{incidence: 30, value: 30},{incidence: 40, value: 60},{incidence: 30, value: 20}]*/
-    addChartBlockTo(trendsBarBox, chartDataBLTitle, chartdataBL, false)
+    addChartBlockTo(trendsBarBox, chartDataBLTitle, chartdataBL, ALIGN_RIGHT)
 }
 
 function addHeaderRowTo(view) {
@@ -483,7 +491,7 @@ async function getData(useStaticCoordsIndex = false) {
         const area = {
             name: attr.GEN,
             rs: attr.RS,
-            areaIBZ: atr.IBZ,
+            areaIBZ: attr.IBZ,
             data: {
                 incidence: parseFloat(attr.cases7_per_100k.toFixed(1)),
                 dailyCases: -1,
@@ -811,6 +819,7 @@ class DataResponse {
 }
 
 function getFileManager() {
+    let fm
     try {
         fm = FileManager.iCloud()
     } catch (e) {
