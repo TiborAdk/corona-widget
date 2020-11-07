@@ -41,6 +41,7 @@ const CONFIG_OPEN_URL = false // open RKI dashboard on tap
 const CONFIG_GRAPH_SHOW_DAYS = 14
 const CONFIG_MAX_CACHED_DAYS = 14 // WARNING!!! Smaller values will delete saved days > CONFIG_MAX_CACHED_DAYS. Backup JSON first ;-)
 const CONFIG_CSV_RVALUE_FIELD = 'Schätzer_7_Tage_R_Wert' // numbered field (column), because of possible encoding changes in columns names on each update
+const CONFIG_REFRESH_INTERVAL = 3600 // Interval to refresh the widget in seconds.
 
 // ============= ============= =============
 
@@ -101,7 +102,7 @@ if (args.widgetParameter) {
 
 let cache = {}
 
-var fm = getFilemanager()
+var fm = getFileManager()
 let fmConfigDirectory = fm.joinPath(fm.documentsDirectory(), '/coronaWidget')
 let data = {}
 
@@ -126,6 +127,8 @@ class IncidenceWidget {
         const dataResponse = await getData(0)
         if (dataResponse.status === 200 || dataResponse.status === 418) {
             let data = dataResponse.data
+
+            // R
             headerRow.addSpacer(3)
             const dataGer = data.country
 
@@ -158,7 +161,7 @@ class IncidenceWidget {
                 }
             }
             if (CONFIG_OPEN_URL) list.url = "https://experience.arcgis.com/experience/478220a4c454480e823b17327b2bf1d4"
-            list.refreshAfterDate = new Date(Date.now() + 60 * 60 * 1000)
+            list.refreshAfterDate = new Date(Date.now() + CONFIG_REFRESH_INTERVAL * 1000)
         } else {
             headerRow.addSpacer()
             list.addSpacer()
@@ -808,7 +811,7 @@ class DataResponse {
     }
 }
 
-function getFilemanager() {
+function getFileManager() {
     try {
         fm = FileManager.iCloud()
     } catch (e) {
