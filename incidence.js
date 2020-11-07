@@ -39,11 +39,15 @@
 // ============= KONFIGURATION =============
 
 const CONFIG_OPEN_URL = false // open RKI dashboard on tap
-const CONFIG_SHOW_AREA_ICON = true // show "Icon" before AreaName: Like KS = Kreisfreie Stadt, LK = Landkreis,...
+const CONFIG_AREA_SHOW_ICON = true // show "Icon" before AreaName: Like KS = Kreisfreie Stadt, LK = Landkreis,...
+
 const CONFIG_GRAPH_SHOW_DAYS = 14
-const CONFIG_MAX_CACHED_DAYS = 21 // WARNING!!! Smaller values will delete saved days > CONFIG_MAX_CACHED_DAYS. Backup JSON first ;-)
+const CONFIG_GRAPH_TITLE_ABOVE = false  // show title of the charts above the
+const CONFIG_GRAPH_UPSIDE_DOWN = false    // show graphs upside down (0 is top, max is bottom, default is: 0 at bottom and max at the top)
+
+const CONFIG_CACHE_MAX_DAYS = 21 // WARNING!!! Smaller values will delete saved days > CONFIG_CACHE_MAX_DAYS. Backup JSON first ;-)
 const CONFIG_CSV_RVALUE_FIELD = 'Schätzer_7_Tage_R_Wert' // numbered field (column), because of possible encoding changes in columns names on each update
-const CONFIG_REFRESH_INTERVAL = 3600
+const CONFIG_REFRESH_INTERVAL = 3600    // interval the widget is updated in (in seconds)
 
 // ============= ============= =============
 
@@ -295,7 +299,7 @@ function addIncidence(view, area, state, useStaticCoordsIndex = false, status = 
 
     let areaNameFontSize = 14
     let areaIcon = getAreaIcon(area.areaIBZ)
-    if (areaIcon && CONFIG_SHOW_AREA_ICON) {
+    if (areaIcon && CONFIG_AREA_SHOW_ICON) {
         let areaNameIconBox = areaNameStack.addStack()
         areaNameIconBox.borderColor = new Color('#999999', 0.3)
         areaNameIconBox.borderWidth = 2
@@ -389,18 +393,23 @@ function addChartBlockTo(view, trendtitle, chartdata, align = ALIGN_LEFT) {
     block.layoutVertically()
     block.size = new Size(58, 24)
 
+    let graphImg = generateGraph(chartdata, 58, 10, align).getImage()
+    let chartImg
+
+    if (!CONFIG_GRAPH_TITLE_ABOVE) chartImg = block.addImage(graphImg)
+
     let textRow = block.addStack()
     if (align === ALIGN_RIGHT) textRow.addSpacer()
     let chartText = textRow.addText(trendtitle)
     if (align === ALIGN_LEFT) textRow.addSpacer()
     chartText.font = Font.mediumSystemFont(10)
 
-    let graphImg = generateGraph(chartdata, 58, 10, align).getImage()
-    let chartImg = block.addImage(graphImg)
+    if (CONFIG_GRAPH_TITLE_ABOVE) chartImg = block.addImage(graphImg)
+
     chartImg.resizable = false
 }
 
-function generateGraph(data, width, height, align = ALIGN_LEFT, zeroTop = false) {
+function generateGraph(data, width, height, align = ALIGN_LEFT, upsideDown = CONFIG_GRAPH_UPSIDE_DOWN) {
     let context = new DrawContext()
     context.size = new Size(width, height)
     context.opaque = false
@@ -424,7 +433,7 @@ function generateGraph(data, width, height, align = ALIGN_LEFT, zeroTop = false)
 
         let h = Math.max(2, Math.round((Math.abs(value) / max) * height))
         let x = xOffset + (w + 1) * index
-        let y = (!zeroTop) ? height - h : 0
+        let y = (!upsideDown) ? height - h : 0
         let rect = new Rect(x, y, w, h)
         context.setFillColor(getIncidenceColor((item.value > 1) ? item.incidence : 0))
         context.fillRect(rect)
@@ -626,7 +635,7 @@ function populateDailyCases(data) {
     return data
 }
 
-function limitData(data, days=CONFIG_MAX_CACHED_DAYS) {
+function limitData(data, days=CONFIG_CACHE_MAX_DAYS) {
     const dataKeys = Object.keys(data);
     const lastKeys = dataKeys.slice(Math.max(dataKeys.length - days, 0))
     let dataLimited = {}
