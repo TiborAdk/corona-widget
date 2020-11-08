@@ -2,9 +2,9 @@
 
 ![IMG_5438](https://raw.githubusercontent.com/rphl/corona-widget/master/screenshot.png)
 
-Dank der positiven Resonanz, jetzt im Repo zur einfacheren Wartung/Erweiterung ( [Mein original GIST](https://gist.github.com/rphl/0491c5f9cb345bf831248732374c4ef5) ) Feedback, PRs, etc. sind Willkommen.
+Forked from [original repository](https://github.com/rphl/corona-widget) ( [rphls original GIST](https://gist.github.com/rphl/0491c5f9cb345bf831248732374c4ef5) )
 
-**☕️ Einen Kaffee ausgeben 🙃:** https://ko-fi.com/rapha
+**☕️ Rphl einen Kaffee ausgeben 🙃:** https://ko-fi.com/rapha
 
 # Features
 
@@ -23,11 +23,14 @@ Dank der positiven Resonanz, jetzt im Repo zur einfacheren Wartung/Erweiterung (
 # Installation/Update
 
 ## Manual
-* Open in Safari: https://raw.githubusercontent.com/rphl/corona-widget/master/incidence.js
+* Open in Safari: https://raw.githubusercontent.com/tiboradk/corona-widget/master/incidence.js
 * Copy Source
 * Open Scriptable, Paste copied Scripttext as new or replace an old
 
 ## Automatic
+**Not supported for this repository!**
+
+Guide of for the base repository:
 * (SOON) Via new Scriptable WidgetGallery: https://github.com/rphl/corona-widget/issues/25
 * Via Kurzbefehle (Shortcuts) App
 * ...other Option: https://github.com/rphl/corona-widget/issues/24
@@ -40,15 +43,15 @@ Data will be cached in the Cachefolder: **Dateien (App)** > **iCloud** > **Scrip
 
 ## Static Coordinates/MediumWidget
 
-Set Widgetparameter for each column, seperated by ";" Format: `POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)`
+Set Widgetparameter for each column, separated by ";" Format: `POSITION,LAT,LONG(,NAME);POSITION,LAT,LONG(,NAME)`
 Second column is only visible if you set Widgetparameter for it. Check examples.
 
 
 ## Static Coordinates
 * First column is static (No second column): `0,51.1244,6.7353`
-* Second column is static (Second column is visble, MediumWidget): `1,51.1244,6.7353`
-* Both columns are static (both are visble, MediumWidget): `0,51.1244,6.7353;1,51.1244,6.7353`
-* Only second column is static (both are visble, MediumWidget): `1,51.1244,6.7353`
+* Second column is static (Second column is visible, MediumWidget): `1,51.1244,6.7353`
+* Both columns are static (both are visible, MediumWidget): `0,51.1244,6.7353;1,51.1244,6.7353`
+* Only second column is static (both are visible, MediumWidget): `1,51.1244,6.7353`
  
 ## Custom Names
  * Custom Name: `0,51.1244,6.7353,Home`
@@ -63,3 +66,4 @@ Second column is only visible if you set Widgetparameter for it. Check examples.
 ### Examples:
  * Filename = coronaWidget01511.json
  * Config set to: 1,51.1244,6.7353,Work,01511
+
