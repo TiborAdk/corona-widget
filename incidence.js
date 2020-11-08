@@ -53,7 +53,7 @@ const CONFIG_REFRESH_INTERVAL = 3600    // interval the widget is updated in (in
 
 const outputFields = 'GEN,cases,cases_per_100k,cases7_per_100k,cases7_bl_per_100k,last_update,BL,RS,IBZ';
 const apiUrl = (location) => `https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_Landkreisdaten/FeatureServer/0/query?where=1%3D1&outFields=${outputFields}&geometry=${location.longitude.toFixed(3)}%2C${location.latitude.toFixed(3)}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin&returnGeometry=false&outSR=4326&f=json`
-const outputFieldsStates = 'Fallzahl,LAN_ew_GEN,cases7_bl_per_100k';
+const outputFieldsStates = 'Fallzahl,LAN_ew_GEN,cases7_bl_per_100k,Aktualisierung';
 const apiUrlStates = `https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/Coronaf%E4lle_in_den_Bundesl%E4ndern/FeatureServer/0/query?where=1%3D1&outFields=${outputFieldsStates}&returnGeometry=false&outSR=4326&f=json`
 const apiUrlNewCases = 'https://services7.arcgis.com/mOBPykOjAyBO2ZKk/arcgis/rest/services/RKI_COVID19/FeatureServer/0/query?f=json&where=NeuerFall%20IN(1%2C%20-1)&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&outStatistics=%5B%7B%22statisticType%22%3A%22sum%22%2C%22onStatisticField%22%3A%22AnzahlFall%22%2C%22outStatisticFieldName%22%3A%22value%22%7D%5D&resultType=standard&cacheHint=true'
 const apiRUrl = `https://www.rki.de/DE/Content/InfAZ/N/Neuartiges_Coronavirus/Projekte_RKI/Nowcasting_Zahlen_csv.csv?__blob=publicationFile`
@@ -106,7 +106,11 @@ if (args.widgetParameter) {
     //latitude:48.137154, longitude: 11.57612, name:false
 }
 
-let cache = {}
+let cache = {
+    states: {},
+    country: {},
+    url: {}
+}
 let fm = getFileManager()
 let fmConfigDirectory = fm.joinPath(fm.documentsDirectory(), '/coronaWidget')
 let data = {}
@@ -129,25 +133,30 @@ class IncidenceWidget {
     async createWidget() {
         const list = new ListWidget()
         const headerRow = addHeaderRowTo(list)
-        const dataResponse = await getData(0)
-        if (dataResponse.status === 200 || dataResponse.status === 418) {
-            let data = dataResponse.data
 
-            // R
-            headerRow.addSpacer(3)
-            const dataGer = data.country
+        // R
+        const rData = await getRData()
+        headerRow.addSpacer(3)
+        addLabelTo(headerRow, ('' + rData.r.toFixed(2)).replace('.', ',') + 'ᴿ', Font.mediumSystemFont(14))
+        headerRow.addSpacer()
 
-            let todayData = getDataForDate(dataGer.data, 0)
-            const rData = todayData.r
-            addLabelTo(headerRow, ('' + rData.r.toFixed(2)).replace('.', ',') + 'ᴿ', Font.mediumSystemFont(14))
-            headerRow.addSpacer()
+        // GER
+        const dataResponseGer = await getDataGer()
+        if (dataResponseGer.status === 200 || dataResponseGer.status === 418) {
+            const dataGer = dataResponseGer.data
 
-            // GER
             let chartdata = getChartData(dataGer.data)
             let chartDataTitle = getLastCasesAndTrend(dataGer.data)
             addChartBlockTo(headerRow, chartDataTitle, chartdata, ALIGN_RIGHT)
             headerRow.addSpacer(0)
             list.addSpacer(3)
+        }
+
+
+        const dataResponse = await getDataAreaState(0)
+        if (dataResponse.status === 200 || dataResponse.status === 418) {
+            const data = dataResponse.data
+            LOG(data)
 
             // AREA0
             const incidenceRow = list.addStack()
@@ -159,7 +168,7 @@ class IncidenceWidget {
 
             // AREA1
             if (MEDIUMWIDGET) {
-                const dataResponse1 = await getData(1)
+                const dataResponse1 = await getDataAreaState(1)
                 if (dataResponse1.status === 200 || dataResponse1.status === 418) {
                     let data1 = dataResponse1.data
                     addIncidenceBlockTo(incidenceRow, data1.area, data1.state, [2, padding, 10, 10], 1, dataResponse1.status)
@@ -456,7 +465,7 @@ async function getLocation(staticCoordinateIndex = false) {
 
 async function cachedRequest(url, type = 'json') {
     const index = type + '_' + url
-    const cached = cache[index]
+    const cached = cache.url[index]
     let res
 
     if (typeof cached === 'undefined') {
@@ -468,21 +477,97 @@ async function cachedRequest(url, type = 'json') {
                 res = await new Request(url).loadString()
                 break;
         }
-        cache[index] = res
+        cache.url[index] = res
     } else {
         res = cached
     }
     return res
 }
 
-async function getData(useStaticCoordsIndex = false) {
+async function getRData() {
+    if (typeof cache.rValue !== 'undefined') {
+        return cache.rValue
+    }
+
     let rValue = 0
     try {
         rValue = await getRValue()
+        cache.rValue = rValue
     } catch (e) {
         console.warn(e)
     }
 
+    return rValue
+}
+
+async function getStatesData() {
+    // check if data for states is already cached
+    if (Object.keys(cache.states).length > 0) {
+        return cache.states
+    }
+
+    let dataStates = await cachedRequest(apiUrlStates, 'json')
+    const statesData = dataStates.features.map((f) => {
+        return {
+            BL: BUNDESLAENDER_SHORT[f.attributes.LAN_ew_GEN],
+            incidence: f.attributes.cases7_bl_per_100k,
+            cases: f.attributes.Fallzahl,
+            updatedTS: f.attributes.Aktualisierung
+        }
+    })
+
+    // cache data
+    Object.values(statesData).forEach((value) => {
+        cache.states[value.BL] = {
+            name: value.BL,
+            incidence: value.incidence,
+            cases: value.cases,
+            dailyCases: -1,
+            updated: date2updatedStr(new Date(value.updatedTS)),
+            updatedTS: value.updatedTS
+        }
+    })
+
+    return cache.states
+}
+
+async function getDataState(name) {
+    let data = cache.states[name]
+    if (typeof data === 'undefined') {
+        const states = await getStatesData()
+        data = states[name]
+    }
+
+    const state = {
+        name: name,
+        data: {
+            incidence: parseFloat(data.incidence.toFixed(1)),
+            cases: data.cases,
+            dailyCases: -1,
+            updated: data.updated,
+            updatedTS: data.updatedTS
+        }
+    }
+
+    const preparedDataState = await prepareData(state.name, 'NOTHING', state.data)
+    if (preparedDataState.status === 200) {
+        state.data = preparedDataState.data
+        saveData(state.name, state)
+    }
+
+    return new DataResponse(state, preparedDataState.status)
+}
+
+async function getDataGer() {
+    // check if country already cached
+    if (Object.keys(cache.country).length > 0) {
+        return new DataResponse(cache.country, 200)
+    }
+
+    // get r-value
+    const rValue = await getRData()
+
+    // get new cases
     let cases = -1
     try {
         let dataCases = await cachedRequest(apiUrlNewCases, 'json')
@@ -491,6 +576,35 @@ async function getData(useStaticCoordsIndex = false) {
         console.warn(e)
     }
 
+    // states data
+    const states = await getStatesData()
+
+    const statesKeys = Object.keys(states)
+    const averageIncidence = Object.values(states).reduce((a, b) => a + b.incidence, 0) / statesKeys.length
+    const updated = states[statesKeys[0]].updated
+
+    const country = {
+        name: 'GER',
+        data: {
+            incidence: parseFloat(averageIncidence.toFixed(1)),
+            dailyCases: cases,
+            r: rValue,
+            updated: updated,
+            updatedTS: getTimestamp(updated),
+        }
+    }
+
+    const preparedDataCountry = await prepareData('GER', 'NOTHING', country.data, false)
+    if (preparedDataCountry.status === 200) {
+        country.data = preparedDataCountry.data
+        saveData('GER', country)
+    }
+
+    return new DataResponse(country, preparedDataCountry.status)
+
+}
+
+async function getDataAreaState(useStaticCoordsIndex = false) {
     try {
         // AREA DATA
         const location = await getLocation(useStaticCoordsIndex)
@@ -501,6 +615,7 @@ async function getData(useStaticCoordsIndex = false) {
             name: attr.GEN,
             rs: attr.RS,
             areaIBZ: attr.IBZ,
+            bl: BUNDESLAENDER_SHORT[attr.BL],
             data: {
                 incidence: parseFloat(attr.cases7_per_100k.toFixed(1)),
                 dailyCases: -1,
@@ -516,70 +631,12 @@ async function getData(useStaticCoordsIndex = false) {
             saveData(area.rs, area)
         }
 
-        // STATES DATA
-        let dataStates = await cachedRequest(apiUrlStates, 'json')
-        const allStatesData = dataStates.features.map((f) => {
-            return {
-                BL: BUNDESLAENDER_SHORT[f.attributes.LAN_ew_GEN],
-                incidence: f.attributes.cases7_bl_per_100k,
-                cases: f.attributes.Fallzahl,
-                updated: attr.last_update,
-                updatedTS: getTimestamp(attr.last_update)
-            }
-        })
+        // STATE
+        const state = (await getDataState(area.bl)).data
 
-        const statesData = getStateData(allStatesData, BUNDESLAENDER_SHORT[attr.BL])
-        const averageIncidence = allStatesData.reduce((a, b) => a + b.incidence, 0) / allStatesData.length
-
-        const state = {
-            name: BUNDESLAENDER_SHORT[attr.BL],
-            data: {
-                incidence: parseFloat(statesData.incidence.toFixed(1)),
-                cases: statesData.cases,
-                dailyCases: -1,
-                updated: attr.last_update,
-                updatedTS: getTimestamp(attr.last_update)
-            }
-        }
-
-        const preparedDataState = await prepareData(state.name, 'NOTHING', state.data)
-        if (preparedDataState.status === 200) {
-            state.data = preparedDataState.data
-            saveData(state.name, state)
-        }
-
-        const country = {
-            name: 'GER',
-            data: {
-                incidence: parseFloat(averageIncidence.toFixed(1)),
-                dailyCases: cases,
-                r: rValue,
-                updated: attr.last_update,
-                updatedTS: getTimestamp(attr.last_update),
-            }
-        }
-
-        const preparedDataCountry = await prepareData('GER', 'NOTHING', country.data, false)
-        if (preparedDataCountry.status === 200) {
-            country.data = preparedDataCountry.data
-            saveData('GER', country)
-        }
-
-        // FORMATTED DATA
-        const res = {
-            area: area,
-            state: state,
-            country: country,
-            updated: attr.last_update,
-            updatedTS: getTimestamp(attr.last_update),
-        }
+        return new DataResponse({area: area, state: state}, preparedDataArea.status)
         //const preparedDataResponse = await prepareData(attr.RS, attr.GEN, res)
         //if (preparedDataResponse.status === 200) saveData(attr.RS, preparedDataResponse.data)
-        if (preparedDataArea.status === 200 && preparedDataState.status === 200 && preparedDataCountry.status === 200) {
-            return new DataResponse(res, 200)
-        } else {
-            return new DataResponse({}, 404)
-        }
     } catch (e) {
         console.warn(e)
         if (typeof staticCoordinates[useStaticCoordsIndex] !== 'undefined' && staticCoordinates[useStaticCoordsIndex].cacheId) {
@@ -650,7 +707,7 @@ function migrateData(loggedData) {
     Object.keys(loggedData).forEach((key, index) => {
         // CHECK FOR OLD FORMAT
         if (typeof loggedData[key].incidence !== 'undefined') {
-            const stateData = getStateData(loggedData[key].incidencePerState, loggedData[key].nameBL)
+            const stateData = filterState(loggedData[key].incidencePerState, loggedData[key].nameBL)
             migratedData[key] = {
                 area: {
                     incidence: loggedData[key].incidence,
@@ -684,7 +741,7 @@ function getTimestamp(dateStr) {
     return new Date(m[3], m[2]-1, m[1], m[4], m[5]).getTime()
 }
 
-function getStateData (incidencePerState, nameBL) {
+function filterState(incidencePerState, nameBL) {
     return incidencePerState.filter(item => {
         return item.BL === nameBL
     }).pop()
@@ -740,10 +797,20 @@ function parseInput (input) {
     return _coords
 }
 
+function prepend(str, n, padding) {
+    return ('' + str).padStart(n, padding)
+}
+
 function date2dateKey(date) {
-    const day = ('' + date.getDate()).padStart(2, '0')
-    const month = ('' + (date.getMonth() + 1)).padStart(2, '0')
+    const day = prepend(date.getDate(), 2, '0')
+    const month = prepend(date.getMonth() + 1, 2, '0')
     return `${day}.${month}.${date.getFullYear()}`
+}
+
+function date2updatedStr(date) {
+    const hour = prepend(date.getHours(), 2, '0')
+    const min = prepend(date.getMinutes(), 2, '0')
+    return date2dateKey(date) + ', ' + hour + ':' + min
 }
 
 function date2dateKeyISO(date) {
